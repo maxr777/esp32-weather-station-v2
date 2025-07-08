@@ -28,15 +28,6 @@
 
 static const char *TAG = "WEATHER_STATION";
 
-void bme280_fill_out_fields(uint8_t bme280_data[], int size)
-{
-    if (size != 8)
-    {
-        fprintf(stderr, "ERROR: The size of bme280_data array should be 8 bytes\n");
-        return;
-    }
-}
-
 typedef struct
 {
     double temperature;
@@ -47,6 +38,8 @@ typedef struct
 void app_main(void)
 {
     ESP_LOGI(TAG, "init");
+
+    // i2c setup
 
     i2c_master_bus_config_t bus_config = {
         .i2c_port = I2C_NUM_0,
@@ -70,16 +63,21 @@ void app_main(void)
     i2c_master_dev_handle_t bme280_handle;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &bme280_config, &bme280_handle));
 
+    // BME280 reset
+
+    uint8_t reset_bytes[2] = {0xE0, 0xB6};
+    ESP_ERROR_CHECK(i2c_master_transmit(bme280_handle, reset_bytes, 2, 1000));
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    uint8_t buf = 0xF7;
     uint8_t bme280_data[8] = {0};
-    uint8_t buf[20] = {0xF7};
 
     while (1)
     {
         ESP_LOGI(TAG, "loop start");
-        esp_err_t ret = i2c_master_transmit_receive(bme280_handle, buf, 1, bme280_data, 8, 1000);
+        ESP_ERROR_CHECK(i2c_master_transmit_receive(bme280_handle, &buf, 1, bme280_data, 8, 1000));
         for (int i = 0; i < 8; i++)
         {
-            // ESP_LOGI(TAG, bme280_data[i]);
             printf("%d\n", bme280_data[i]);
         }
         vTaskDelay(2000 / portTICK_PERIOD_MS);
