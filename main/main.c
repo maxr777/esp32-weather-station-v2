@@ -30,10 +30,49 @@ static const char *TAG = "WEATHER_STATION";
 
 typedef struct
 {
+    BME280_calibration_coefficients coefficients;
+    int32_t adc_T; // raw temp reading from the analog to digital converter (adc)
+    // t_fine = fine temperature, meaning processed temp reading with higher
+    // precision than the final output (used internally by the compensation algorithms)
+    int32_t t_fine;
     double temperature;
     double humidity;
     double pressure;
 } BME280;
+
+typedef struct
+{
+    uint16_t dig_T1;
+    int16_t dig_T2;
+    int16_t dig_T3;
+    uint16_t dig_P1;
+    int16_t dig_P2;
+    int16_t dig_P3;
+    int16_t dig_P4;
+    int16_t dig_P5;
+    int16_t dig_P6;
+    int16_t dig_P7;
+    int16_t dig_P8;
+    int16_t dig_P9;
+    uint8_t dig_H1;
+    int16_t dig_H2;
+    uint8_t dig_H3;
+    int16_t dig_H4;
+    int16_t dig_H5;
+    int8_t dig_H6;
+} BME280_calibration_coefficients;
+
+void BME280_compensate_temperature(BME280 *bme)
+{
+    // compensates the temperature using factory calibration coefficients and formats it in human readable form to BME280.temperature
+    // also calculates BME280.t_fine for later use in pressure and humidity compensation
+    // the calculations itself were copied from the datasheet
+    int32_t var1, var2, T;
+    var1 = ((((bme->adc_T >> 3) - ((int32_t)bme->coefficients.dig_T1 << 1))) * ((int32_t)bme->coefficients.dig_T2)) >> 11;
+    var2 = (((((bme->adc_T >> 4) - ((int32_t)bme->coefficients.dig_T1)) * ((bme->adc_T >> 4) - ((int32_t)bme->coefficients.dig_T1))) >> 12) * ((int32_t)bme->coefficients.dig_T3)) >> 14;
+    bme->t_fine = var1 + var2;
+    bme->temperature = ((bme->t_fine * 5 + 128) >> 8) / 100.0;
+}
 
 void app_main(void)
 {
